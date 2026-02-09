@@ -36,8 +36,7 @@ dependencies:
   # WakeLock
   wakelock_plus: ^1.4.0
   
-  # QR Scanner + Permissions
-  qr_code_scanner: ^1.0.0
+  # Permissions
   permission_handler: ^11.0.0
   
   # Navigation
@@ -48,9 +47,6 @@ dependencies:
   
   # Network + Connectivity
   connectivity_plus: ^5.0.0
-  
-  # Local Notifications
-  flutter_local_notifications: ^16.0.0
 
 dev_dependencies:
   flutter_test:

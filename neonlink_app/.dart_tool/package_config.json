@@ -218,24 +218,6 @@
       "languageVersion": "3.1"
     },
     {
-      "name": "flutter_local_notifications",
-      "rootUri": "file:///C:/Users/User/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_local_notifications-16.3.3",
-      "packageUri": "lib/",
-      "languageVersion": "2.17"
-    },
-    {
-      "name": "flutter_local_notifications_linux",
-      "rootUri": "file:///C:/Users/User/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_local_notifications_linux-4.0.1",
-      "packageUri": "lib/",
-      "languageVersion": "2.17"
-    },
-    {
-      "name": "flutter_local_notifications_platform_interface",
-      "rootUri": "file:///C:/Users/User/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_local_notifications_platform_interface-7.2.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.17"
-    },
-    {
       "name": "flutter_localizations",
       "rootUri": "file:///D:/myapps/flutter/packages/flutter_localizations",
       "packageUri": "lib/",
@@ -524,12 +506,6 @@
       "languageVersion": "3.6"
     },
     {
-      "name": "qr_code_scanner",
-      "rootUri": "file:///C:/Users/User/AppData/Local/Pub/Cache/hosted/pub.dev/qr_code_scanner-1.0.1",
-      "packageUri": "lib/",
-      "languageVersion": "2.17"
-    },
-    {
       "name": "riverpod",
       "rootUri": "file:///C:/Users/User/AppData/Local/Pub/Cache/hosted/pub.dev/riverpod-2.6.1",
       "packageUri": "lib/",
@@ -672,12 +648,6 @@
       "rootUri": "file:///C:/Users/User/AppData/Local/Pub/Cache/hosted/pub.dev/test_api-0.7.7",
       "packageUri": "lib/",
       "languageVersion": "3.5"
-    },
-    {
-      "name": "timezone",
-      "rootUri": "file:///C:/Users/User/AppData/Local/Pub/Cache/hosted/pub.dev/timezone-0.9.4",
-      "packageUri": "lib/",
-      "languageVersion": "2.19"
     },
     {
       "name": "timing",
