@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <OutputType>Exe</OutputType>
+    <StartupObject>NeonLink.Server.Program</StartupObject>
+    <!-- Self-contained deployment for Windows -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <!-- Disable automatic content items to avoid duplicates -->
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+  </PropertyGroup>
+
+  <!-- WPF UI files are intentionally excluded - server runs as headless service -->
+  <!-- UI folder removed - server uses ASP.NET Core WebSockets -->
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Core Dependencies -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.8.5" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.0" />
+    
+    <!-- mDNS Service Discovery -->
+    <PackageReference Include="Makaretu.Dns.Multicast" Version="0.27.0" />
+    
+    <!-- Channels for Producer-Consumer -->
+    <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
+    
+    <!-- WMI for SMART data -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NeonLink.Shared\NeonLink.Shared.csproj" />
+  </ItemGroup>
+</Project>
