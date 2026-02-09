@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/neon_theme.dart';
-import '../../../services/websocket_service.dart';
-import '../control/control_screen.dart';
-import '../themes/theme_store_screen.dart';
-import '../settings/settings_screen.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../providers/telemetry_provider.dart';
+import '../../../providers/connection_provider.dart';
+import '../../shared/widgets/circular_gauge.dart';
+import '../../shared/widgets/status_indicator.dart';
+
+enum DashboardMode { circularGauges, compact, graph, gaming }
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -14,254 +17,408 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  int _selectedIndex = 0;
-
-  final List<Widget> _screens = [
-    const DashboardContent(),
-    const ControlScreen(),
-    const ThemeStoreScreen(),
-    const SettingsScreen(),
-  ];
+  DashboardMode _currentMode = DashboardMode.circularGauges;
 
   @override
   Widget build(BuildContext context) {
+    final telemetry = ref.watch(telemetryProvider);
+    final connectionState = ref.watch(connectionProvider);
+
     return Scaffold(
       backgroundColor: NeonTheme.background,
-      body: Row(
+      appBar: AppBar(
+        backgroundColor: NeonTheme.surface,
+        title: Row(
+          children: [
+            StatusIndicator(
+              level: connectionState.isConnected 
+                  ? StatusLevel.safe 
+                  : StatusLevel.disconnected,
+              label: connectionState.isConnected ? 'Connected' : 'Disconnected',
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.settings, color: NeonTheme.primary),
+              onPressed: () {},
+            ),
+          ],
+        ),
+      ),
+      body: Column(
         children: [
-          // Navigation Rail
-          NavigationRail(
-            backgroundColor: NeonTheme.surface,
-            indicatorColor: NeonTheme.primary.withOpacity(0.2),
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) {
-              setState(() => _selectedIndex = index);
-            },
-            labelType: NavigationRailLabelType.all,
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.dashboard, color: NeonTheme.text),
-                label: Text('Dashboard', style: TextStyle(color: NeonTheme.text)),
+          // Mode Selector
+          _buildModeSelector(),
+          
+          // Content
+          Expanded(
+            child: _buildContent(telemetry),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildModeSelector() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: DashboardMode.values.map((mode) {
+          final isSelected = mode == _currentMode;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FilterChip(
+              selected: isSelected,
+              label: Text(mode.name),
+              selectedColor: NeonTheme.primary,
+              backgroundColor: NeonTheme.surface,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.black : NeonTheme.primary,
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.settings, color: NeonTheme.text),
-                label: Text('Control', style: TextStyle(color: NeonTheme.text)),
+              onSelected: (selected) {
+                setState(() => _currentMode = mode);
+              },
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildContent(telemetry) {
+    switch (_currentMode) {
+      case DashboardMode.circularGauges:
+        return _buildCircularGaugesMode(telemetry);
+      case DashboardMode.compact:
+        return _buildCompactMode(telemetry);
+      case DashboardMode.graph:
+        return _buildGraphMode(telemetry);
+      case DashboardMode.gaming:
+        return _buildGamingMode(telemetry);
+    }
+  }
+
+  Widget _buildCircularGaugesMode(telemetry) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // CPU & GPU Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              CircularGauge(
+                value: telemetry?.system.cpu.usage ?? 0,
+                label: 'CPU',
+                unit: '%',
+                size: 140,
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.palette, color: NeonTheme.text),
-                label: Text('Themes', style: TextStyle(color: NeonTheme.text)),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.tune, color: NeonTheme.text),
-                label: Text('Settings', style: TextStyle(color: NeonTheme.text)),
+              CircularGauge(
+                value: telemetry?.system.gpu.usage ?? 0,
+                label: 'GPU',
+                unit: '%',
+                size: 140,
               ),
             ],
           ),
-          const VerticalDivider(width: 1, color: NeonTheme.primary),
-          // Main Content
-          Expanded(child: _screens[_selectedIndex]),
+          const SizedBox(height: 24),
+          
+          // RAM & Temperature Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              CircularGauge(
+                value: telemetry?.system.ram.usedPercent ?? 0,
+                label: 'RAM',
+                unit: '%',
+                size: 140,
+              ),
+              CircularGauge(
+                value: telemetry?.system.gpu.temp ?? 0,
+                label: 'GPU Temp',
+                unit: '°C',
+                max: 100,
+                size: 140,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          // Detailed Info Cards
+          _buildInfoCard(
+            'CPU',
+            [
+              _buildInfoRow('Usage', formatPercentage(telemetry?.system.cpu.usage ?? 0)),
+              _buildInfoRow('Temperature', formatTemperature(telemetry?.system.cpu.temp ?? 0)),
+              _buildInfoRow('Cores', '${telemetry?.system.cpu.cores ?? 0}'),
+              _buildInfoRow('Clock', formatClockSpeed(telemetry?.system.cpu.clockSpeed ?? 0)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          _buildInfoCard(
+            'GPU',
+            [
+              _buildInfoRow('Usage', formatPercentage(telemetry?.system.gpu.usage ?? 0)),
+              _buildInfoRow('Temperature', formatTemperature(telemetry?.system.gpu.temp ?? 0)),
+              _buildInfoRow('Memory', '${telemetry?.system.gpu.memory ?? 0} MB'),
+              _buildInfoRow('VRAM', '${telemetry?.system.gpu.vram ?? 0} MB'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          _buildInfoCard(
+            'Network',
+            [
+              _buildInfoRow('Download', formatNetworkSpeed(telemetry?.system.network.downloadSpeed ?? 0)),
+              _buildInfoRow('Upload', formatNetworkSpeed(telemetry?.system.network.uploadSpeed ?? 0)),
+              _buildInfoRow('IP', telemetry?.system.network.ip ?? '--'),
+            ],
+          ),
         ],
       ),
     );
   }
-}
 
-class DashboardContent extends ConsumerWidget {
-  const DashboardContent({super.key});
+  Widget _buildCompactMode(telemetry) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildCompactCard('CPU', telemetry?.system.cpu.usage ?? 0, NeonTheme.primary),
+        const SizedBox(height: 8),
+        _buildCompactCard('GPU', telemetry?.system.gpu.usage ?? 0, NeonTheme.secondary),
+        const SizedBox(height: 8),
+        _buildCompactCard('RAM', telemetry?.system.ram.usedPercent ?? 0, NeonTheme.accent),
+        const SizedBox(height: 8),
+        _buildCompactCard('GPU Temp', telemetry?.system.gpu.temp ?? 0, Colors.orange, unit: '°C'),
+      ],
+    );
+  }
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final telemetryData = ref.watch(telemetryProvider);
-    final connectionStatus = ref.watch(connectionStatusProvider);
+  Widget _buildGraphMode(telemetry) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.show_chart,
+            size: 64,
+            color: NeonTheme.primary.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Graph Mode',
+            style: TextStyle(
+              color: NeonTheme.text,
+              fontSize: 24,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Real-time charts coming soon',
+            style: TextStyle(
+              color: Colors.grey[400],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return StreamBuilder<ConnectionStatus>(
-      stream: ref.read(webSocketServiceProvider).statusStream,
-      builder: (context, snapshot) {
-        final status = snapshot.data ?? connectionStatus;
-        
-        return Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'SYSTEM MONITOR',
-                    style: TextStyle(
-                      fontFamily: 'Orbitron',
-                      fontSize: 24,
-                      color: NeonTheme.primary,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: status == ConnectionStatus.connected 
-                          ? NeonTheme.safe.withOpacity(0.2)
-                          : NeonTheme.critical.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: status == ConnectionStatus.connected 
-                            ? NeonTheme.safe 
-                            : NeonTheme.critical,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          status == ConnectionStatus.connected 
-                              ? Icons.wifi 
-                              : Icons.wifi_off,
-                          size: 16,
-                          color: status == ConnectionStatus.connected 
-                              ? NeonTheme.safe 
-                              : NeonTheme.critical,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          status == ConnectionStatus.connected ? 'Connected' : 'Disconnected',
-                          style: TextStyle(
-                            fontFamily: 'Rajdhani',
-                            color: status == ConnectionStatus.connected 
-                                ? NeonTheme.safe 
-                                : NeonTheme.critical,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              
-              // Metrics Grid
-              Expanded(
-                child: GridView.count(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
+  Widget _buildGamingMode(telemetry) {
+    final gaming = telemetry?.gaming;
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          if (gaming?.active == true) ...[
+            Card(
+              color: NeonTheme.surface,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
                   children: [
-                    _buildMetricCard(
-                      icon: Icons.memory,
-                      title: 'CPU',
-                      value: '${telemetryData?.system.cpu.usage.toStringAsFixed(0) ?? '0'}%',
-                      subtitle: '${telemetryData?.system.cpu.temp.toStringAsFixed(0) ?? '0'}°C',
-                      progress: (telemetryData?.system.cpu.usage ?? 0) / 100,
-                      color: _getUsageColor(telemetryData?.system.cpu.usage ?? 0),
+                    const Icon(
+                      Icons.sports_esports,
+                      size: 48,
+                      color: NeonTheme.secondary,
                     ),
-                    _buildMetricCard(
-                      icon: Icons.speed,
-                      title: 'GPU',
-                      value: '${telemetryData?.system.gpu.usage.toStringAsFixed(0) ?? '0'}%',
-                      subtitle: '${telemetryData?.system.gpu.temp.toStringAsFixed(0) ?? '0'}°C',
-                      progress: (telemetryData?.system.gpu.usage ?? 0) / 100,
-                      color: _getUsageColor(telemetryData?.system.gpu.usage ?? 0),
-                    ),
-                    _buildMetricCard(
-                      icon: Icons.storage,
-                      title: 'RAM',
-                      value: '${telemetryData?.system.ram.usedPercent.toStringAsFixed(0) ?? '0'}%',
-                      subtitle: '${telemetryData?.system.ram.usedGb.toStringAsFixed(1)} / ${telemetryData?.system.ram.totalGb.toStringAsFixed(1)} GB',
-                      progress: (telemetryData?.system.ram.usedPercent ?? 0) / 100,
-                      color: _getUsageColor(telemetryData?.system.ram.usedPercent ?? 0),
-                    ),
-                    _buildMetricCard(
-                      icon: Icons.hard_drive,
-                      title: 'STORAGE',
-                      value: '${telemetryData?.system.storage.usedPercent.toStringAsFixed(0) ?? '0'}%',
-                      subtitle: '${telemetryData?.system.storage.readSpeed ?? 0} / ${telemetryData?.system.storage.writeSpeed ?? 0} MB/s',
-                      progress: (telemetryData?.system.storage.usedPercent ?? 0) / 100,
-                      color: _getUsageColor(telemetryData?.system.storage.usedPercent ?? 0),
+                    const SizedBox(height: 8),
+                    Text(
+                      gaming?.activeProcess ?? 'Game',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildGamingStat('FPS', formatFPS(gaming?.fps), NeonTheme.safe),
+              _buildGamingStat('Frame Time', formatFrameTime(gaming?.frameTime), NeonTheme.warning),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 24),
+          
+          _buildInfoCard(
+            'GPU Metrics',
+            [
+              _buildInfoRow('Usage', formatPercentage(telemetry?.system.gpu.usage ?? 0)),
+              _buildInfoRow('Temperature', formatTemperature(telemetry?.system.gpu.temp ?? 0)),
+              _buildInfoRow('VRAM', '${telemetry?.system.gpu.vram ?? 0} MB'),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Color _getUsageColor(double usage) {
-    if (usage < 50) return NeonTheme.safe;
-    if (usage < 80) return NeonTheme.warning;
-    return NeonTheme.critical;
-  }
-
-  Widget _buildMetricCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required String subtitle,
-    required double progress,
-    required Color color,
-  }) {
+  Widget _buildInfoCard(String title, List<Widget> rows) {
     return Card(
       color: NeonTheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: color.withOpacity(0.3)),
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(icon, color: color, size: 28),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Orbitron',
-                    fontSize: 14,
-                    color: NeonTheme.text,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
             Text(
-              value,
-              style: TextStyle(
-                fontFamily: 'Rajdhani',
-                fontSize: 36,
+              title,
+              style: const TextStyle(
+                color: NeonTheme.primary,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: color,
               ),
-            ),
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.grey[800],
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(3),
             ),
             const SizedBox(height: 12),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontSize: 12,
-                color: NeonTheme.text.withOpacity(0.7),
-              ),
-            ),
+            ...rows,
           ],
         ),
       ),
     );
   }
-}
 
-// Providers
-final telemetryProvider = StateProvider<TelemetryData?>((ref) => null);
-final connectionStatusProvider = StateProvider<ConnectionStatus>((ref) => ConnectionStatus.disconnected);
-final webSocketServiceProvider = Provider<WebSocketService>((ref) => WebSocketService());
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(color: Colors.grey[400]),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactCard(String label, double value, Color color, {String unit = '%'}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: NeonTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+          Text(
+            '${value.toStringAsFixed(1)}$unit',
+            style: TextStyle(
+              color: color,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGamingStat(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(color: Colors.grey[400]),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomNav() {
+    final items = [
+      {'icon': Icons.dashboard, 'label': 'Dashboard'},
+      {'icon': Icons.gamepad, 'label': 'Control'},
+      {'icon': Icons.palette, 'label': 'Themes'},
+      {'icon': Icons.settings, 'label': 'Settings'},
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: NeonTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: items.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          final isSelected = index == 0; // Dashboard is selected by default
+          
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(
+                  item['icon'] as IconData,
+                  color: isSelected ? NeonTheme.primary : Colors.grey,
+                ),
+                onPressed: () {},
+              ),
+              Text(
+                item['label'] as String,
+                style: TextStyle(
+                  color: isSelected ? NeonTheme.primary : Colors.grey,
+                  fontSize: 10,
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+}

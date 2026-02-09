@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../core/constants/app_constants.dart';
 
 class DiscoveredPC {
@@ -60,7 +61,7 @@ class DiscoveryService {
   }
 
   void _sendBroadcastQuery() {
-    final message = 'NEONLINK_DISCOVER';
+    const message = 'NEONLINK_DISCOVER';
     _socket!.send(
       message.codeUnits,
       InternetAddress('255.255.255.255'),

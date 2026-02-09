@@ -9,22 +9,33 @@ class NeonTheme {
   static const surface = Color(0xFF1A1F35);      // Dark Slate
   static const text = Color(0xFFE0E0E0);         // Off-White
   
+  // OLED
+  static const oledBlack = Color(0xFF000000);
+  
   // Status zones
   static const safe = Color(0xFF00FF88);
   static const warning = Color(0xFFFFB800);
   static const critical = Color(0xFFFF3366);
 
+  final bool isOLEDMode;
+
+  const NeonTheme({this.isOLEDMode = false});
+
+  NeonTheme copyWith({bool? isOLEDMode}) {
+    return NeonTheme(isOLEDMode: isOLEDMode ?? this.isOLEDMode);
+  }
+
+  Color get effectiveBackground => isOLEDMode ? oledBlack : background;
+
   static final darkTheme = ThemeData(
     useMaterial3: true,
-    colorScheme: ColorScheme.dark(
+    colorScheme: const ColorScheme.dark(
       primary: primary,
       secondary: secondary,
       tertiary: accent,
-      background: background,
       surface: surface,
       onPrimary: Colors.black,
       onSecondary: Colors.black,
-      onBackground: text,
       onSurface: text,
     ),
     scaffoldBackgroundColor: background,
@@ -36,7 +47,7 @@ class NeonTheme {
         fontWeight: FontWeight.bold,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -76,11 +87,9 @@ class NeonTheme {
       primary: primary,
       secondary: secondary,
       tertiary: accent,
-      background: Colors.white,
       surface: Colors.grey[100]!,
       onPrimary: Colors.black,
       onSecondary: Colors.black,
-      onBackground: Colors.black,
       onSurface: Colors.black,
     ),
     scaffoldBackgroundColor: Colors.white,
