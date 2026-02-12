@@ -20,14 +20,19 @@ class DiscoveredPC {
 class DiscoveryService {
   RawDatagramSocket? _socket;
   final _discoveryController = StreamController<DiscoveredPC>.broadcast();
+  final _errorController = StreamController<String>.broadcast();
   Timer? _broadcastTimer;
   bool _isDiscovering = false;
 
   Stream<DiscoveredPC> get discoveredPCs => _discoveryController.stream;
+  Stream<String> get errors => _errorController.stream;
   bool get isDiscovering => _isDiscovering;
 
   Future<void> startDiscovery() async {
-    if (_isDiscovering) return;
+    if (_isDiscovering) {
+      debugPrint('[DEBUG] Discovery already in progress, skipping');
+      return;
+    }
     _isDiscovering = true;
 
     try {
@@ -36,6 +41,8 @@ class DiscoveryService {
         AppConstants.discoveryPort,
       );
 
+      debugPrint('[DEBUG] Discovery socket bound to port ${AppConstants.discoveryPort}');
+
       _socket!.listen(
         (event) {
           if (event == RawSocketEvent.read) {
@@ -43,7 +50,8 @@ class DiscoveryService {
           }
         },
         onError: (error) {
-          debugPrint('Discovery socket error: $error');
+          debugPrint('[DEBUG] Discovery socket error: $error');
+          _errorController.add('Socket error: $error');
           stopDiscovery();
         },
       );
@@ -54,7 +62,10 @@ class DiscoveryService {
         (_) => _sendBroadcastQuery(),
       );
     } catch (e) {
-      debugPrint('Failed to start discovery: $e');
+      debugPrint('[DEBUG] Failed to start discovery: $e');
+      // DEBUG: Log more details about the error
+      debugPrint('[DEBUG] Discovery error type: ${e.runtimeType}');
+      _errorController.add('Failed to start discovery: $e');
       _isDiscovering = false;
       rethrow;
     }
@@ -101,5 +112,6 @@ class DiscoveryService {
   void dispose() {
     stopDiscovery();
     _discoveryController.close();
+    _errorController.close();
   }
 }

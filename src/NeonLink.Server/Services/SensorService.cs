@@ -159,6 +159,9 @@ public class SensorService : IDisposable
     private TelemetryData ExtractTelemetryData()
     {
         var adminLevel = _adminChecker.CheckAdminLevel().Level;
+        
+        // Extract GPU info once and reuse for gaming detection
+        var gpuInfo = ExtractGpuInfo(adminLevel);
 
         return new TelemetryData
         {
@@ -166,12 +169,12 @@ public class SensorService : IDisposable
             System = new SystemInfo
             {
                 Cpu = ExtractCpuInfo(adminLevel),
-                Gpu = ExtractGpuInfo(adminLevel),
+                Gpu = gpuInfo,  // Reuse extracted GPU info
                 Ram = ExtractRamInfo(adminLevel),
                 Storage = ExtractStorageInfo(adminLevel),
                 Network = ExtractNetworkInfo(adminLevel)
             },
-            Gaming = ExtractGamingInfo(),
+            Gaming = ExtractGamingInfo(gpuInfo),  // Pass GPU info to avoid re-extraction
             AdminLevel = adminLevel.ToString()
         };
     }
@@ -196,17 +199,21 @@ public class SensorService : IDisposable
     {
         var cpuInfo = new CpuInfo();
 
+        // DEBUG: Log hardware iteration for CPU detection
+        _logger?.LogDebug("Searching for CPU hardware. Total hardware count: {Count}", 
+            _computer.Hardware.Count(h => h.HardwareType == HardwareType.Cpu));
+
         foreach (var hardware in _computer.Hardware)
         {
             if (hardware.HardwareType != HardwareType.Cpu)
                 continue;
 
             cpuInfo.Name = hardware.Name;
+            _logger?.LogDebug("Found CPU hardware: {Name}, Sensors: {SensorCount}", 
+                hardware.Name, hardware.Sensors.Count);
 
             foreach (var sensor in hardware.Sensors)
             {
-                cpuInfo.Name = hardware.Name;
-
                 if (sensor.SensorType == SensorType.Load && sensor.Name == "CPU Total")
                 {
                     cpuInfo.Usage = sensor.Value ?? 0;
@@ -421,14 +428,13 @@ public class SensorService : IDisposable
     /// <summary>
     ///     Извлечь информацию об игровом режиме
     /// </summary>
-    private GamingInfo? ExtractGamingInfo()
+    private GamingInfo? ExtractGamingInfo(GpuInfo gpuInfo)
     {
         if (!_settings.Hardware.EnableGamingDetection)
             return null;
 
         // Gaming detection через GPU usage heuristic
-        var gpuInfo = ExtractGpuInfo(_adminChecker.CheckAdminLevel().Level);
-        
+        // GPU info is passed to avoid re-extraction
         var isGaming = gpuInfo.Usage >= _settings.Gaming.GpuUsageThreshold;
 
         return new GamingInfo

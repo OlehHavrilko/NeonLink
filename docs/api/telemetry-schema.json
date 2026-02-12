@@ -1,0 +1,295 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NeonLink Telemetry Data Schema",
+  "description": "JSON Schema for telemetry data exchanged between NeonLink Server and clients",
+  "version": "1.0.0",
+  "type": "object",
+  "required": ["timestamp", "system"],
+  "properties": {
+    "timestamp": {
+      "type": "integer",
+      "description": "Unix timestamp in seconds",
+      "minimum": 0
+    },
+    "system": {
+      "$ref": "#/definitions/SystemInfo"
+    },
+    "gaming": {
+      "oneOf": [
+        { "$ref": "#/definitions/GamingInfo" },
+        { "type": "null" }
+      ]
+    },
+    "adminLevel": {
+      "type": "string",
+      "enum": ["Full", "Limited", "Minimal", "None"],
+      "default": "Full"
+    }
+  },
+  "definitions": {
+    "SystemInfo": {
+      "type": "object",
+      "required": ["cpu", "gpu", "ram", "storage"],
+      "properties": {
+        "cpu": { "$ref": "#/definitions/CpuInfo" },
+        "gpu": { "$ref": "#/definitions/GpuInfo" },
+        "ram": { "$ref": "#/definitions/RamInfo" },
+        "storage": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/StorageInfo" }
+        },
+        "network": {
+          "oneOf": [
+            { "$ref": "#/definitions/NetworkInfo" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "CpuInfo": {
+      "type": "object",
+      "required": ["name", "usage", "temp", "clock"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "CPU model name"
+        },
+        "usage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "CPU usage percentage"
+        },
+        "temp": {
+          "type": "number",
+          "minimum": 0,
+          "description": "CPU temperature in Celsius"
+        },
+        "clock": {
+          "type": "number",
+          "minimum": 0,
+          "description": "CPU clock speed in GHz"
+        },
+        "power": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "CPU power consumption in Watts"
+        },
+        "cores": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CpuCoreInfo" },
+          "description": "Per-core information"
+        }
+      }
+    },
+    "CpuCoreInfo": {
+      "type": "object",
+      "required": ["id", "usage"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Core index"
+        },
+        "usage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Core usage percentage"
+        },
+        "temp": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Core temperature in Celsius"
+        },
+        "clock": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Core clock speed in GHz"
+        }
+      }
+    },
+    "GpuInfo": {
+      "type": "object",
+      "required": ["name", "usage", "temp"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "GPU model name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["NVIDIA", "AMD", "Intel", ""],
+          "description": "GPU vendor"
+        },
+        "usage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "GPU usage percentage"
+        },
+        "temp": {
+          "type": "number",
+          "minimum": 0,
+          "description": "GPU temperature in Celsius"
+        },
+        "vramUsed": {
+          "type": "number",
+          "minimum": 0,
+          "description": "VRAM used in GB"
+        },
+        "vramTotal": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total VRAM in GB"
+        },
+        "clock": {
+          "type": "number",
+          "minimum": 0,
+          "description": "GPU core clock in GHz"
+        },
+        "memoryClock": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "GPU memory clock in GHz"
+        },
+        "power": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "GPU power consumption in Watts"
+        },
+        "fanSpeed": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Fan speed in RPM"
+        }
+      }
+    },
+    "RamInfo": {
+      "type": "object",
+      "required": ["used", "total"],
+      "properties": {
+        "used": {
+          "type": "number",
+          "minimum": 0,
+          "description": "RAM used in GB"
+        },
+        "total": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total RAM in GB"
+        },
+        "speed": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "RAM speed in MHz"
+        }
+      }
+    },
+    "StorageInfo": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Storage device name"
+        },
+        "temp": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Storage temperature in Celsius"
+        },
+        "health": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Storage health percentage"
+        },
+        "smart": {
+          "oneOf": [
+            { "$ref": "#/definitions/StorageSmartData" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "StorageSmartData": {
+      "type": "object",
+      "properties": {
+        "tbw": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Total Bytes Written in TB"
+        },
+        "powerOnHours": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Power on hours"
+        },
+        "reallocatedSectors": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Number of reallocated sectors"
+        },
+        "temperature": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Temperature in Celsius"
+        }
+      }
+    },
+    "NetworkInfo": {
+      "type": "object",
+      "properties": {
+        "download": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Download speed in Gbps"
+        },
+        "upload": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Upload speed in Gbps"
+        },
+        "ping": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Ping in milliseconds"
+        },
+        "ip": {
+          "type": ["string", "null"],
+          "description": "IP address"
+        }
+      }
+    },
+    "GamingInfo": {
+      "type": "object",
+      "required": ["active"],
+      "properties": {
+        "active": {
+          "type": "boolean",
+          "description": "Whether gaming mode is active"
+        },
+        "fps": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Current FPS"
+        },
+        "fps1Low": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "1% low FPS"
+        },
+        "frametime": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Frame time in milliseconds"
+        },
+        "activeProcess": {
+          "type": ["string", "null"],
+          "description": "Active game process name"
+        }
+      }
+    }
+  }
+}

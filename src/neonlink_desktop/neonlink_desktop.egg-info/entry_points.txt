@@ -1,0 +1,2 @@
+[console_scripts]
+neonlink = neonlink_desktop.__main__:main

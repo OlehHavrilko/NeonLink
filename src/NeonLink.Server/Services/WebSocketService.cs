@@ -18,6 +18,7 @@ public class WebSocketService : IDisposable
     private readonly ILogger<WebSocketService>? _logger;
     private readonly TelemetryChannelService _channelService;
     private readonly SecurityService _securityService;
+    private readonly SensorService _sensorService;
     private readonly Settings _settings;
     
     // Активные подключения
@@ -34,11 +35,13 @@ public class WebSocketService : IDisposable
         ILogger<WebSocketService>? logger,
         TelemetryChannelService channelService,
         SecurityService securityService,
+        SensorService sensorService,
         Settings settings)
     {
         _logger = logger;
         _channelService = channelService;
         _securityService = securityService;
+        _sensorService = sensorService;
         _settings = settings;
         _startTime = DateTime.UtcNow;
 
@@ -288,7 +291,8 @@ public class WebSocketService : IDisposable
             if (int.TryParse(interval, out var ms))
             {
                 ms = Math.Clamp(ms, 100, 5000);
-                // TODO: Update sensor service polling interval
+                _sensorService.SetPollingInterval(ms);
+                _logger?.LogInformation("Polling interval updated to {Interval}ms by client", ms);
                 return new { success = true, intervalMs = ms };
             }
         }

@@ -1,0 +1,126 @@
+[project]
+name = "neonlink-desktop"
+version = "1.0.0"
+description = "NeonLink Desktop Control Center - Modern desktop application for managing scripts and connections"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "NeonLink Team", email = "team@neonlink.io"}
+]
+keywords = ["desktop", "gui", "pyqt6", "automation", "scripts", "control-center"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32",
+    "Environment :: MacOS :: X11",
+    "Environment :: X11",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+dependencies = [
+    # GUI Framework
+    "PyQt6>=6.6.0",
+    
+    # Async
+    "anyio>=4.0",
+    "aiofiles>=23.0",
+    
+    # Security
+    "cryptography>=41.0",
+    "keyring>=24.0",
+    
+    # WebSocket/API
+    "websockets>=12.0",
+    "aiohttp>=3.9",
+    
+    # Configuration
+    "pydantic>=2.5",
+    "python-dotenv>=1.0",
+    
+    # Drag-and-Drop & Files
+    "watchdog>=4.0",
+    
+    # Logging
+    "loguru>=0.7",
+    "colorlog>=6.8",
+    
+    # Utilities
+    "tenacity>=8.2",
+    "marshmallow>=3.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.1",
+    "black>=23.0",
+    "isort>=5.12",
+    "mypy>=1.5",
+    "flake8>=6.1",
+    "pre-commit>=3.5",
+]
+
+docs = [
+    "sphinx>=7.2",
+    "sphinx-rtd-theme>=1.3",
+]
+
+[project.scripts]
+neonlink = "neonlink_desktop.__main__:main"
+
+[project.urls]
+Homepage = "https://neonlink.io"
+Repository = "https://github.com/neonlink/neonlink-desktop"
+Issues = "https://github.com/neonlink/neonlink-desktop/issues"
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["neonlink_desktop"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["neonlink_desktop"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["neonlink_desktop*"]

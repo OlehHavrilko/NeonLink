@@ -1,0 +1,208 @@
+Metadata-Version: 2.4
+Name: neonlink-desktop
+Version: 1.0.0
+Summary: NeonLink Desktop Control Center - Modern desktop application for managing scripts and connections
+Author-email: NeonLink Team <team@neonlink.io>
+License: MIT
+Project-URL: Homepage, https://neonlink.io
+Project-URL: Repository, https://github.com/neonlink/neonlink-desktop
+Project-URL: Issues, https://github.com/neonlink/neonlink-desktop/issues
+Keywords: desktop,gui,pyqt6,automation,scripts,control-center
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Win32
+Classifier: Environment :: MacOS :: X11
+Classifier: Environment :: X11
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: System :: Systems Administration
+Classifier: Topic :: Utilities
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: PyQt6>=6.6.0
+Requires-Dist: anyio>=4.0
+Requires-Dist: aiofiles>=23.0
+Requires-Dist: cryptography>=41.0
+Requires-Dist: keyring>=24.0
+Requires-Dist: keyrings.cryptfile>=1.7.0
+Requires-Dist: websockets>=12.0
+Requires-Dist: aiohttp>=3.9
+Requires-Dist: pydantic>=2.5
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: watchdog>=4.0
+Requires-Dist: loguru>=0.7
+Requires-Dist: colorlog>=6.8
+Requires-Dist: tenacity>=8.2
+Requires-Dist: marshmallow>=3.20
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21; extra == "dev"
+Requires-Dist: pytest-cov>=4.1; extra == "dev"
+Requires-Dist: black>=23.0; extra == "dev"
+Requires-Dist: isort>=5.12; extra == "dev"
+Requires-Dist: mypy>=1.5; extra == "dev"
+Requires-Dist: flake8>=6.1; extra == "dev"
+Requires-Dist: pre-commit>=3.5; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: sphinx>=7.2; extra == "docs"
+Requires-Dist: sphinx-rtd-theme>=1.3; extra == "docs"
+
+# NeonLink Desktop Control Center
+
+Modern desktop application for managing scripts and connections with NeonLink Server.
+
+## Features
+
+- **Script Management**: Add, edit, and remove Python, Bash, and PowerShell scripts
+- **Drag-and-Drop**: Easily add scripts by dragging files into the application
+- **Secure Storage**: AES-256-GCM encryption for configuration
+- **System Keyring**: Secure credential storage using OS-native keyring
+- **Real-time Logs**: View script output in real-time
+- **Connection Manager**: Manage server connections with easy CRUD operations
+- **Theming**: Dark and light themes with modern UI
+
+## Requirements
+
+- Python 3.10 or higher
+- Windows 10+, macOS 10.15+, or Linux
+- 100MB disk space
+- 100MB RAM minimum
+
+## Installation
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/neonlink/neonlink-desktop.git
+cd neonlink-desktop/src
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python -m neonlink_desktop
+```
+
+### Using pip
+
+```bash
+pip install neonlink-desktop
+neonlink
+```
+
+### Building from Source
+
+```bash
+# Install build dependencies
+pip install pyinstaller
+
+# Build executable
+pyinstaller neonlink_desktop.spec
+```
+
+## Usage
+
+### Adding Scripts
+
+1. Click "Add Script" or drag files into the script list
+2. Select script type (Python, Bash, PowerShell)
+3. Configure installation method (copy, symlink, or PATH)
+
+### Managing Connections
+
+1. Click "Add Connection" to create a new profile
+2. Enter server details (host, port, username)
+3. Credentials are stored securely in the system keyring
+4. Test connection before saving
+
+### Running Scripts
+
+1. Select a script from the list
+2. Click "Run" to execute
+3. View real-time logs in the log panel
+4. Use "Stop" to terminate a running script
+
+## Configuration
+
+Configuration is stored in `~/.config/neonlink/` (Linux/macOS) or `%APPDATA%\NeonLink\` (Windows):
+
+- `config.enc` - Encrypted application configuration
+- `connections.enc` - Encrypted connection profiles
+- `scripts/` - Local script storage
+- `logs/` - Application logs
+
+## Architecture
+
+```
+NeonLink.Desktop/
+├── src/neonlink_desktop/
+│   ├── __main__.py           # Entry point
+│   ├── app.py                # Application class
+│   ├── config.py             # Configuration constants
+│   ├── models/               # Pydantic data models
+│   ├── viewmodels/           # MVVM ViewModels
+│   ├── views/                # PyQt6 UI components
+│   ├── services/             # Business logic services
+│   │   ├── config_manager.py # AES-256-GCM encryption
+│   │   ├── credential_manager.py # System keyring
+│   │   ├── script_runner.py  # Async script execution
+│   │   └── validation_service.py # Input validation
+│   └── resources/
+│       ├── styles/           # QSS themes
+│       └── icons/            # Application icons
+└── tests/                    # Unit and integration tests
+```
+
+## Development
+
+### Setting up Development Environment
+
+```bash
+# Install development dependencies
+pip install -r requirements.txt
+pip install pytest black isort mypy
+
+# Run tests
+pytest tests/
+
+# Format code
+black src/neonlink_desktop/
+isort src/neonlink_desktop/
+
+# Type checking
+mypy src/neonlink_desktop/
+```
+
+### Running Tests
+
+```bash
+pytest tests/ -v
+pytest tests/ --cov=neonlink_desktop
+```
+
+## Security
+
+- **Encryption**: AES-256-GCM for all configuration files
+- **Key Derivation**: PBKDF2HMAC-SHA256 with 600,000 iterations
+- **Credential Storage**: OS-native keyring (Windows Credential Manager, macOS Keychain, Linux SecretService)
+- **Secure Memory**: Sensitive data handled in memory with minimal exposure
+
+## License
+
+MIT License - see LICENSE file for details.
+
+## Support
+
+- GitHub Issues: https://github.com/neonlink/neonlink-desktop/issues
+- Documentation: https://docs.neonlink.io
+- Discord: https://discord.gg/neonlink

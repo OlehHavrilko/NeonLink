@@ -16,8 +16,8 @@ public class SecurityService
     private readonly ILogger<SecurityService>? _logger;
     private readonly Settings _settings;
     
-    // Rate limiting: sliding window per client
-    private readonly ConcurrentDictionary<string, List<DateTime>> _requestLog = new();
+    // Rate limiting: ConcurrentDictionary with timestamp lists (improved from List+lock)
+    private readonly ConcurrentDictionary<string, ConcurrentQueue<DateTime>> _requestLog = new();
     
     // Command whitelist - быстрая проверка
     private readonly HashSet<string> _safeCommands;
@@ -114,35 +114,39 @@ public class SecurityService
     }
 
     /// <summary>
-    ///     Проверить rate limiting
+    ///     Проверить rate limiting (optimized with ConcurrentQueue)
     /// </summary>
     public bool IsRateLimited(string clientId)
     {
         var now = DateTime.UtcNow;
         var windowStart = now.AddMinutes(-1);
         
-        var requests = _requestLog.GetOrAdd(clientId, _ => new List<DateTime>());
+        var queue = _requestLog.GetOrAdd(clientId, _ => new ConcurrentQueue<DateTime>());
         
-        lock (requests)
+        // Remove old entries (> 1 minute) - thread-safe without lock
+        while (queue.TryPeek(out var timestamp) && timestamp < windowStart)
         {
-            // Удалить старые записи (> 1 минута)
-            requests.RemoveAll(t => t < windowStart);
-            
-            var count = requests.Count;
-            
-            // Добавить текущий запрос
-            requests.Add(now);
-            
-            var isLimited = count >= _settings.Security.RateLimitPerMinute;
-            
-            if (isLimited)
-            {
-                _logger?.LogWarning("Rate limit exceeded for client {Client}: {Count} req/min",
-                    clientId, count);
-            }
-            
-            return isLimited;
+            queue.TryDequeue(out _);
         }
+        
+        var count = queue.Count;
+        
+        // DEBUG: Log rate limit check
+        _logger?.LogDebug("[DEBUG] Rate limit check for {Client}: {Count}/{Limit} requests", 
+            clientId, count, _settings.Security.RateLimitPerMinute);
+        
+        // Add current request
+        queue.Enqueue(now);
+        
+        var isLimited = count >= _settings.Security.RateLimitPerMinute;
+        
+        if (isLimited)
+        {
+            _logger?.LogWarning("Rate limit exceeded for client {Client}: {Count} req/min",
+                clientId, count);
+        }
+        
+        return isLimited;
     }
 
     /// <summary>

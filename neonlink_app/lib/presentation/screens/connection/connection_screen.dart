@@ -130,7 +130,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00F0FF),
                 foregroundColor: Colors.black,
-                padding: EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
             const SizedBox(height: 24),
@@ -189,7 +189,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF00AA),
                 foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: const Text('CONNECT'),
             ),

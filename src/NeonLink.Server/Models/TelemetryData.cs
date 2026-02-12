@@ -4,9 +4,16 @@ namespace NeonLink.Server.Models;
 
 /// <summary>
 ///     Главный класс телеметрии, отправляемый на Android клиент
+///     Версия API: 1.0.0
 /// </summary>
 public class TelemetryData
 {
+    /// <summary>
+    ///     Версия API для совместимости клиента и сервера
+    /// </summary>
+    [JsonPropertyName("version")]
+    public string Version { get; set; } = "1.0.0";
+
     [JsonPropertyName("timestamp")]
     public long Timestamp { get; set; }
 

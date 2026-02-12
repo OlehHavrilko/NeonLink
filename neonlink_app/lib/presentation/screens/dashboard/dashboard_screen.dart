@@ -149,10 +149,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           _buildInfoCard(
             'CPU',
             [
+              _buildInfoRow('Name', telemetry?.system.cpu.name ?? 'Unknown'),
               _buildInfoRow('Usage', formatPercentage(telemetry?.system.cpu.usage ?? 0)),
               _buildInfoRow('Temperature', formatTemperature(telemetry?.system.cpu.temp ?? 0)),
-              _buildInfoRow('Cores', '${telemetry?.system.cpu.cores ?? 0}'),
-              _buildInfoRow('Clock', formatClockSpeed(telemetry?.system.cpu.clockSpeed ?? 0)),
+              _buildInfoRow('Cores', '${telemetry?.system.cpu.cores.length ?? 0}'),
+              _buildInfoRow('Clock', formatClockSpeed(telemetry?.system.cpu.clock ?? 0)),
+              if (telemetry?.system.cpu.power != null)
+                _buildInfoRow('Power', '${telemetry!.system.cpu.power!.toStringAsFixed(1)} W'),
             ],
           ),
           const SizedBox(height: 16),
@@ -160,20 +163,62 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           _buildInfoCard(
             'GPU',
             [
+              _buildInfoRow('Name', telemetry?.system.gpu.name ?? 'Unknown'),
+              _buildInfoRow('Type', telemetry?.system.gpu.type ?? 'Unknown'),
               _buildInfoRow('Usage', formatPercentage(telemetry?.system.gpu.usage ?? 0)),
               _buildInfoRow('Temperature', formatTemperature(telemetry?.system.gpu.temp ?? 0)),
-              _buildInfoRow('Memory', '${telemetry?.system.gpu.memory ?? 0} MB'),
-              _buildInfoRow('VRAM', '${telemetry?.system.gpu.vram ?? 0} MB'),
+              _buildInfoRow('VRAM Used', '${(telemetry?.system.gpu.vramUsed ?? 0).toStringAsFixed(1)} GB'),
+              _buildInfoRow('VRAM Total', '${(telemetry?.system.gpu.vramTotal ?? 0).toStringAsFixed(1)} GB'),
+              _buildInfoRow('Clock', formatClockSpeed(telemetry?.system.gpu.clock ?? 0)),
+              if (telemetry?.system.gpu.fanSpeed != null)
+                _buildInfoRow('Fan Speed', '${telemetry!.system.gpu.fanSpeed} RPM'),
             ],
           ),
           const SizedBox(height: 16),
           
           _buildInfoCard(
+            'RAM',
+            [
+              _buildInfoRow('Used', '${(telemetry?.system.ram.used ?? 0).toStringAsFixed(1)} GB'),
+              _buildInfoRow('Total', '${(telemetry?.system.ram.total ?? 0).toStringAsFixed(1)} GB'),
+              _buildInfoRow('Available', '${(telemetry?.system.ram.available ?? 0).toStringAsFixed(1)} GB'),
+              _buildInfoRow('Usage', formatPercentage(telemetry?.system.ram.usedPercent ?? 0)),
+              if (telemetry?.system.ram.speed != null)
+                _buildInfoRow('Speed', '${telemetry!.system.ram.speed} MHz'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Storage Cards
+          if (telemetry?.system.storage.isNotEmpty == true)
+            ...telemetry!.system.storage.map((storage) => 
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildInfoCard(
+                  'Storage: ${storage.name}',
+                  [
+                    if (storage.temp != null)
+                      _buildInfoRow('Temperature', formatTemperature(storage.temp!)),
+                    if (storage.health != null)
+                      _buildInfoRow('Health', '${storage.health}%'),
+                    if (storage.smart != null) ...[
+                      if (storage.smart!.tbw != null)
+                        _buildInfoRow('TBW', '${storage.smart!.tbw} TB'),
+                      if (storage.smart!.powerOnHours != null)
+                        _buildInfoRow('Power On', '${storage.smart!.powerOnHours} h'),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          
+          _buildInfoCard(
             'Network',
             [
-              _buildInfoRow('Download', formatNetworkSpeed(telemetry?.system.network.downloadSpeed ?? 0)),
-              _buildInfoRow('Upload', formatNetworkSpeed(telemetry?.system.network.uploadSpeed ?? 0)),
-              _buildInfoRow('IP', telemetry?.system.network.ip ?? '--'),
+              _buildInfoRow('Download', formatNetworkSpeed(telemetry?.system.network?.download ?? 0)),
+              _buildInfoRow('Upload', formatNetworkSpeed(telemetry?.system.network?.upload ?? 0)),
+              _buildInfoRow('Ping', '${telemetry?.system.network?.ping ?? 0} ms'),
+              _buildInfoRow('IP', telemetry?.system.network?.ip ?? '--'),
             ],
           ),
         ],
@@ -192,6 +237,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         _buildCompactCard('RAM', telemetry?.system.ram.usedPercent ?? 0, NeonTheme.accent),
         const SizedBox(height: 8),
         _buildCompactCard('GPU Temp', telemetry?.system.gpu.temp ?? 0, Colors.orange, unit: '°C'),
+        const SizedBox(height: 8),
+        _buildCompactCard('CPU Temp', telemetry?.system.cpu.temp ?? 0, Colors.red, unit: '°C'),
       ],
     );
   }
@@ -207,7 +254,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             color: NeonTheme.primary.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             'Graph Mode',
             style: TextStyle(
               color: NeonTheme.text,
@@ -265,7 +312,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildGamingStat('FPS', formatFPS(gaming?.fps), NeonTheme.safe),
-              _buildGamingStat('Frame Time', formatFrameTime(gaming?.frameTime), NeonTheme.warning),
+              _buildGamingStat('1% Low', formatFPS(gaming?.fps1Low), NeonTheme.warning),
+              _buildGamingStat('Frame Time', formatFrameTime(gaming?.frametime), NeonTheme.accent),
             ],
           ),
           const SizedBox(height: 24),
@@ -275,7 +323,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             [
               _buildInfoRow('Usage', formatPercentage(telemetry?.system.gpu.usage ?? 0)),
               _buildInfoRow('Temperature', formatTemperature(telemetry?.system.gpu.temp ?? 0)),
-              _buildInfoRow('VRAM', '${telemetry?.system.gpu.vram ?? 0} MB'),
+              _buildInfoRow('VRAM Used', '${(telemetry?.system.gpu.vramUsed ?? 0).toStringAsFixed(1)} GB'),
+              _buildInfoRow('VRAM Usage', formatPercentage(telemetry?.system.gpu.vramUsagePercent ?? 0)),
+              if (telemetry?.system.gpu.power != null)
+                _buildInfoRow('Power', '${telemetry!.system.gpu.power!.toStringAsFixed(1)} W'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          _buildInfoCard(
+            'CPU Metrics',
+            [
+              _buildInfoRow('Usage', formatPercentage(telemetry?.system.cpu.usage ?? 0)),
+              _buildInfoRow('Temperature', formatTemperature(telemetry?.system.cpu.temp ?? 0)),
+              _buildInfoRow('Clock', formatClockSpeed(telemetry?.system.cpu.clock ?? 0)),
+              if (telemetry?.system.cpu.power != null)
+                _buildInfoRow('Power', '${telemetry!.system.cpu.power!.toStringAsFixed(1)} W'),
             ],
           ),
         ],
@@ -386,9 +449,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ];
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: NeonTheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
