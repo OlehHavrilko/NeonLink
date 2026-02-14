@@ -1,50 +1,73 @@
-# NeonLink Server - Linux Docker Container
-# Hardware monitoring is simulated on Linux using mock data
-# For full hardware monitoring, run on Windows with native hardware access
+# NeonLink Server - .NET 8 with PostgreSQL
+# Optimized multi-stage build for production
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-WORKDIR /app
-EXPOSE 9876
-EXPOSE 9877
-
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
 WORKDIR /src
 
-# Copy shared project
-COPY src/NeonLink.Shared/NeonLink.Shared.csproj src/NeonLink.Shared/NeonLink.Shared.csproj
-RUN dotnet restore src/NeonLink.Shared/NeonLink.Shared.csproj
+# Install PostgreSQL client for migrations
+RUN apk add --no-cache postgresql15-client curl
 
-# Copy server project
-COPY src/NeonLink.Server/NeonLink.Server.csproj src/NeonLink.Server/NeonLink.Server.csproj
+# Copy solution and projects
+COPY NeonLink.sln ./
+COPY src/NeonLink.Shared/NeonLink.Shared.csproj src/NeonLink.Shared/
+COPY src/NeonLink.Server/NeonLink.Server.csproj src/NeonLink.Server/
+
+# Restore dependencies
 RUN dotnet restore src/NeonLink.Server/NeonLink.Server.csproj
 
-# Copy server source files
-COPY src/NeonLink.Server/ src/NeonLink.Server/
+# Copy all source files
 COPY src/NeonLink.Shared/ src/NeonLink.Shared/
+COPY src/NeonLink.Server/ src/NeonLink.Server/
 
-# Build for Linux
+# Build application
 WORKDIR /src/src/NeonLink.Server
 RUN dotnet build -c Release -o /app/build \
-    -p:RuntimeIdentifier=linux-x64 \
-    -p:PublishSingleFile=false \
-    -p:SelfContained=false
+    --no-restore
 
+# Publish application
 FROM build AS publish
-WORKDIR /src/src/NeonLink.Server
 RUN dotnet publish -c Release -o /app/publish \
-    -p:RuntimeIdentifier=linux-x64 \
+    --no-build \
     -p:PublishSingleFile=false \
     -p:SelfContained=false
 
-FROM base AS final
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS final
 WORKDIR /app
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    postgresql15-client \
+    curl \
+    icu-data-full
+
+# Enable ICU for globalization
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0
+
+# Create non-root user
+RUN addgroup -g 1000 appgroup && \
+    adduser -u 1000 -G appgroup -s /bin/sh -D appuser
+
+# Copy published files
 COPY --from=publish /app/publish .
 
-# Create logs directory
-RUN mkdir -p logs
+# Create directories with proper permissions
+RUN mkdir -p logs && chown -R appuser:appgroup /app
 
-# Set environment variables
-ENV ASPNETCORE_ENVIRONMENT=Docker
-ENV NEONLINK_LOG_LEVEL=Information
+# Switch to non-root user
+USER appuser
+
+# Expose ports
+EXPOSE 9876 9877
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:9876/api/health || exit 1
+
+# Environment variables
+ENV ASPNETCORE_ENVIRONMENT=Docker \
+    NEONLINK_LOG_LEVEL=Information \
+    DOTNET_RUNNING_IN_CONTAINER=true
 
 ENTRYPOINT ["dotnet", "NeonLink.Server.dll"]

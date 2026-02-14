@@ -134,6 +134,11 @@ public class Program
                 services.AddSingleton<CacheService>();
                 services.AddSingleton<CommandService>();
                 services.AddSingleton<WebSocketService>();
+                
+                // Database services
+                services.AddSingleton<IDatabaseService, DatabaseService>();
+                services.AddSingleton<ITelemetryRepository, TelemetryRepository>();
+                services.AddSingleton<ISettingsRepository, SettingsRepository>();
             });
     }
 
@@ -188,6 +193,7 @@ public class Startup
         IApplicationBuilder app, 
         IWebHostEnvironment env,
         WebSocketService wsService,
+        IDatabaseService dbService,
         ILogger<Startup> logger)
     {
         if (env.IsDevelopment())
@@ -204,9 +210,27 @@ public class Startup
         });
 
         app.UseRouting();
+        
+        // Initialize database
+        try
+        {
+            _ = Task.Run(async () => await dbService.InitializeAsync()).Wait(TimeSpan.FromSeconds(10));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Database initialization failed - running without database");
+        }
+        
         app.UseEndpoints(endpoints =>
         {
             endpoints.MapControllers();
+            
+            // Health check endpoint
+            endpoints.MapGet("/api/health", async (ILogger<Startup> logger) =>
+            {
+                return Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
+            });
+            
             endpoints.Map("/ws", async context =>
             {
                 if (context.WebSockets.IsWebSocketRequest)
