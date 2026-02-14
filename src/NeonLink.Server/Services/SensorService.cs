@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
 using NeonLink.Server.Configuration;
 using NeonLink.Server.Models;
@@ -17,8 +18,12 @@ public class SensorService : IDisposable
     
     // Thread-safety: SemaphoreSlim для защиты доступа к Computer
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly Computer _computer;
+    private readonly Computer? _computer;
     private bool _disposed;
+    
+    // Linux mock data
+    private readonly Random _random = new();
+    private bool _isLinux;
 
     // Кеш неизменяемых данных
     private readonly ThreadSafeCache<string, string> _hardwareCache;
@@ -37,15 +42,26 @@ public class SensorService : IDisposable
         _settings = settings;
         _adminChecker = adminChecker;
         
-        // Инициализация LibreHardwareMonitor
-        _computer = new Computer
+        // Проверяем платформу
+        _isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+        
+        if (_isLinux)
         {
-            IsCpuEnabled = _settings.Hardware.EnableCpu,
-            IsGpuEnabled = _settings.Hardware.EnableGpu,
-            IsMemoryEnabled = _settings.Hardware.EnableRam,
-            IsStorageEnabled = _settings.Hardware.EnableStorage,
-            IsNetworkEnabled = _settings.Hardware.EnableNetwork
-        };
+            _logger?.LogInformation("Running on Linux - using mock sensor data");
+            _computer = null;
+        }
+        else
+        {
+            // Инициализация LibreHardwareMonitor для Windows
+            _computer = new Computer
+            {
+                IsCpuEnabled = _settings.Hardware.EnableCpu,
+                IsGpuEnabled = _settings.Hardware.EnableGpu,
+                IsMemoryEnabled = _settings.Hardware.EnableRam,
+                IsStorageEnabled = _settings.Hardware.EnableStorage,
+                IsNetworkEnabled = _settings.Hardware.EnableNetwork
+            };
+        }
 
         _pollingInterval = TimeSpan.FromMilliseconds(_settings.Server.PollingIntervalMs);
         
@@ -63,12 +79,18 @@ public class SensorService : IDisposable
     /// </summary>
     public bool Initialize()
     {
+        if (_isLinux)
+        {
+            _logger?.LogInformation("Linux platform - skipping hardware monitoring initialization");
+            return true;
+        }
+        
         return _lock.WithLock(() =>
         {
             try
             {
-                _computer.Open();
-                _computer.Accept(_visitor);
+                _computer?.Open();
+                _computer?.Accept(_visitor);
                 _logger?.LogInformation("Hardware monitoring started");
                 return true;
             }
@@ -83,9 +105,14 @@ public class SensorService : IDisposable
     /// <summary>
     ///     Получить текущую телеметрию (thread-safe)
     /// </summary>
-    public async Task<TelemetryData> GetCurrentTelemetryAsync()
+    public Task<TelemetryData> GetCurrentTelemetryAsync()
     {
-        return await _lock.WithLockAsync(async () =>
+        if (_isLinux)
+        {
+            return Task.FromResult(CreateLinuxMockTelemetry());
+        }
+        
+        return _lock.WithLockAsync(async () =>
         {
             try
             {
@@ -96,10 +123,13 @@ public class SensorService : IDisposable
                 }
 
                 // Обновить все сенсоры
-                foreach (var hardware in _computer.Hardware)
+                if (_computer != null)
                 {
-                    hardware.Update();
-                    _visitor.VisitHardware(hardware);
+                    foreach (var hardware in _computer.Hardware)
+                    {
+                        hardware.Update();
+                        _visitor.VisitHardware(hardware);
+                    }
                 }
 
                 _lastUpdate = DateTime.UtcNow;
@@ -118,6 +148,11 @@ public class SensorService : IDisposable
     /// </summary>
     public TelemetryData GetCurrentTelemetry()
     {
+        if (_isLinux)
+        {
+            return CreateLinuxMockTelemetry();
+        }
+        
         return _lock.WithLock(() =>
         {
             try
@@ -127,10 +162,13 @@ public class SensorService : IDisposable
                     return CreateCachedTelemetry();
                 }
 
-                foreach (var hardware in _computer.Hardware)
+                if (_computer != null)
                 {
-                    hardware.Update();
-                    _visitor.VisitHardware(hardware);
+                    foreach (var hardware in _computer.Hardware)
+                    {
+                        hardware.Update();
+                        _visitor.VisitHardware(hardware);
+                    }
                 }
 
                 _lastUpdate = DateTime.UtcNow;
@@ -199,6 +237,8 @@ public class SensorService : IDisposable
     {
         var cpuInfo = new CpuInfo();
 
+        if (_computer == null) return cpuInfo;
+
         // DEBUG: Log hardware iteration for CPU detection
         _logger?.LogDebug("Searching for CPU hardware. Total hardware count: {Count}", 
             _computer.Hardware.Count(h => h.HardwareType == HardwareType.Cpu));
@@ -209,8 +249,7 @@ public class SensorService : IDisposable
                 continue;
 
             cpuInfo.Name = hardware.Name;
-            _logger?.LogDebug("Found CPU hardware: {Name}, Sensors: {SensorCount}", 
-                hardware.Name, hardware.Sensors.Count);
+            // Debug logging removed - causes compilation issues on Linux
 
             foreach (var sensor in hardware.Sensors)
             {
@@ -269,6 +308,8 @@ public class SensorService : IDisposable
     {
         var gpuInfo = new GpuInfo();
 
+        if (_computer == null) return gpuInfo;
+
         foreach (var hardware in _computer.Hardware)
         {
             if (hardware.HardwareType != HardwareType.GpuAmd &&
@@ -322,6 +363,8 @@ public class SensorService : IDisposable
     {
         var ramInfo = new RamInfo();
 
+        if (_computer == null) return ramInfo;
+
         foreach (var hardware in _computer.Hardware)
         {
             if (hardware.HardwareType != HardwareType.Memory)
@@ -330,6 +373,7 @@ public class SensorService : IDisposable
             // Попытка получить из WMI если LibreHardwareMonitor не дает
             try
             {
+#if WINDOWS
                 using var wmi = new System.Management.ManagementObjectSearcher(
                     "SELECT TotalVisibleMemorySize FROM Win32_OperatingSystem");
                 foreach (var obj in wmi.Get())
@@ -337,6 +381,7 @@ public class SensorService : IDisposable
                     ramInfo.Total = (double)(ulong)obj["TotalVisibleMemorySize"] / 1024; // KB to GB
                     break;
                 }
+#endif
             }
             catch
             {
@@ -365,6 +410,8 @@ public class SensorService : IDisposable
     private List<StorageInfo> ExtractStorageInfo(AdminLevel level)
     {
         var storageList = new List<StorageInfo>();
+
+        if (_computer == null) return storageList;
 
         foreach (var hardware in _computer.Hardware)
         {
@@ -400,6 +447,8 @@ public class SensorService : IDisposable
     /// </summary>
     private NetworkInfo? ExtractNetworkInfo(AdminLevel level)
     {
+        if (_computer == null) return null;
+
         foreach (var hardware in _computer.Hardware)
         {
             if (hardware.HardwareType != HardwareType.Network)
@@ -484,6 +533,59 @@ public class SensorService : IDisposable
         return null;
     }
 
+    /// <summary>
+    ///     Создать mock телеметрию для Linux
+    /// </summary>
+    private TelemetryData CreateLinuxMockTelemetry()
+    {
+        return new TelemetryData
+        {
+            Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            System = new SystemInfo
+            {
+                Cpu = new CpuInfo
+                {
+                    Name = "Linux Mock CPU",
+                    Usage = _random.Next(5, 30),
+                    Temp = 45 + _random.Next(0, 15),
+                    Clock = 3600 + _random.Next(-200, 200),
+                    Cores = Enumerable.Range(0, 6).Select(i => new CpuCoreInfo
+                    {
+                        Id = i,
+                        Usage = _random.Next(5, 40)
+                    }).ToList()
+                },
+                Gpu = new GpuInfo
+                {
+                    Name = "Linux Mock GPU",
+                    Type = "Mock",
+                    Usage = _random.Next(0, 20),
+                    Temp = 40 + _random.Next(0, 10),
+                    Clock = 1500 + _random.Next(-100, 100),
+                    VramTotal = 8,
+                    VramUsed = 2 + _random.Next(0, 3)
+                },
+                Ram = new RamInfo
+                {
+                    Total = 16,
+                    Used = 6 + _random.Next(0, 4),
+                    Speed = 3200
+                },
+                Storage = new List<StorageInfo>
+                {
+                    new() { Name = "/dev/sda1", Temp = 35 }
+                },
+                Network = new NetworkInfo
+                {
+                    Download = _random.Next(0, 100) / 1000.0,
+                    Upload = _random.Next(0, 50) / 1000.0
+                }
+            },
+            Gaming = null,
+            AdminLevel = "Mock"
+        };
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -492,7 +594,10 @@ public class SensorService : IDisposable
         _lock.Wait();
         try
         {
-            _computer.Close();
+            if (!_isLinux)
+            {
+                _computer?.Close();
+            }
             _disposed = true;
             _logger?.LogInformation("SensorService disposed");
         }

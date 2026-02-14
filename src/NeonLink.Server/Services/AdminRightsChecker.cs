@@ -1,4 +1,4 @@
-using System.Management;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 
 namespace NeonLink.Server.Services;
@@ -61,8 +61,30 @@ public class AdminRightsChecker : IAdminRightsChecker
     {
         try
         {
+            // Linux: проверяем через переменные окружения или Process
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                // В контейнере обычно запускаем без реальных прав
+                // Проверяем через /proc/self/status
+                try
+                {
+                    var statusContent = File.ReadAllText("/proc/self/status");
+                    if (statusContent.Contains("Uid:") && statusContent.Contains("0 "))
+                        return true;
+                }
+                catch { }
+                
+                return Environment.GetEnvironmentVariable("SUDO_UID") != null || 
+                       Environment.GetEnvironmentVariable("ContainerEnvironment") == "true";
+            }
+            
+            // Windows: используем WindowsPrincipal
+#if WINDOWS
             return new WindowsPrincipal(WindowsIdentity.GetCurrent())
                 .IsInRole(WindowsBuiltInRole.Administrator);
+#else
+            return false;
+#endif
         }
         catch
         {
@@ -82,7 +104,29 @@ public class AdminRightsChecker : IAdminRightsChecker
             Level = isAdmin ? AdminLevel.Full : AdminLevel.Limited
         };
 
-        // Проверяем доступность WMI
+        // Linux: ограниченный режим
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            result.Level = AdminLevel.Minimal;
+            result.Message = "Running on Linux - hardware monitoring is simulated";
+            result.AvailableSensors.AddRange(new[]
+            {
+                "CPU (Mock)",
+                "GPU (Mock)",
+                "RAM (Mock)"
+            });
+            result.MissingSensors.AddRange(new[]
+            {
+                "Real Hardware Sensors",
+                "WMI Access",
+                "SMART Data"
+            });
+            _logger?.LogWarning("Running on Linux - limited sensor availability");
+            return result;
+        }
+
+        // Проверяем доступность WMI (Windows)
+#if WINDOWS
         try
         {
             using var wmiQuery = new ManagementObjectSearcher(
@@ -98,6 +142,7 @@ public class AdminRightsChecker : IAdminRightsChecker
         {
             _logger?.LogWarning("WMI query failed - some sensors may be unavailable");
         }
+#endif
 
         // Определяем доступные сенсоры
         result.AvailableSensors.Add("CPU Basic");
@@ -166,6 +211,10 @@ public class AdminRightsChecker : IAdminRightsChecker
                 "⚠ Running without admin rights\n" +
                 "Fan control and advanced sensors are disabled.\n" +
                 "For full functionality, run as administrator.",
+            AdminLevel.Minimal when RuntimeInformation.IsOSPlatform(OSPlatform.Linux) =>
+                "🐧 Running on Linux\n" +
+                "Hardware sensors are simulated (mock data).\n" +
+                "For real hardware data, run on Windows.",
             AdminLevel.Minimal =>
                 "⚠ Limited access detected\n" +
                 "Only basic CPU temperature is available.\n" +

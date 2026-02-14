@@ -6,10 +6,8 @@
     <LangVersion>latest</LangVersion>
     <OutputType>Exe</OutputType>
     <StartupObject>NeonLink.Server.Program</StartupObject>
-    <!-- Self-contained deployment for Windows -->
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
+    <!-- Multi-platform support -->
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
     <!-- Disable automatic content items to avoid duplicates -->
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
@@ -35,7 +33,7 @@
     <!-- Channels for Producer-Consumer -->
     <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
     
-    <!-- WMI for SMART data -->
+    <!-- WMI for SMART data (Windows only) -->
     <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 

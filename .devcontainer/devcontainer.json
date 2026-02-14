@@ -1,0 +1,71 @@
+{
+  "name": "NeonLink Development",
+  "description": "NeonLink Server and Desktop Development Environment",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.yml"
+  ],
+  "service": "server",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  
+  // Port forwarding for API access from Windows
+  "forwardPorts": [
+    9876,
+    9877,
+    8080,
+    5900,
+    6080
+  ],
+  
+  // Features for development tools
+  "features": {
+    "ghcr.io/devcontainer-config/features/dot-config:3": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  
+  // Customizations for VS Code
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // C# and .NET development
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.vscode-dotnet-runtime",
+        "ms-dotnettools.csdevkit",
+        
+        // Docker support
+        "ms-azuretools.vscode-docker",
+        
+        // Remote container support
+        "ms-vscode-remote.remote-containers",
+        
+        // Additional useful extensions
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens",
+        "christian-kohler.path-intellisense",
+        "visualstudioexptteam.vscodeintellicode"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "dotnet.defaultSolution": "NeonLink.sln",
+        "editor.formatOnSave": true,
+        "files.exclude": {
+          "**/bin": true,
+          "**/obj": true
+        }
+      }
+    }
+  },
+  
+  // Post-create command to restore .NET packages
+  "postCreateCommand": "dotnet restore NeonLink.sln",
+  
+  // Run services in development mode
+  "runServices": ["server"],
+  
+  // Keep containers running for development
+  "shutdownAction": "none",
+  
+  // Remote user configuration
+  "remoteUser": "vscode"
+}
