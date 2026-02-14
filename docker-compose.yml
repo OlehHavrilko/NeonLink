@@ -1,5 +1,5 @@
 # NeonLink Docker Compose - Full Infrastructure
-# Services: PostgreSQL, Server, Flutter Builder
+# Services: PostgreSQL, Server, Flutter Builder, Desktop Builder
 
 version: '3.8'
 
@@ -19,7 +19,7 @@ services:
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
       - ./docker/postgres/conf:/etc/postgresql/conf.d:ro
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     networks:
       - neonlink-network
     healthcheck:
@@ -38,17 +38,19 @@ services:
     container_name: neonlink-server
     restart: unless-stopped
     ports:
-      - "9876:9876"
-      - "9877:9877"
+      - "${SERVER_PORT:-9876}:9876"
+      - "${SERVER_DISCOVERY_PORT:-9877}:9877"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Docker
-      - NEONLINK_LOG_LEVEL=Information
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB:-neonlink};Username=${POSTGRES_USER:-neonlink};Password=${POSTGRES_PASSWORD:-neonlink_secret}
-      - NEONLINK_DB__HOST=postgres
-      - NEONLINK_DB__PORT=5432
-      - NEONLINK_DB__NAME=${POSTGRES_DB:-neonlink}
-      - NEONLINK_DB__USER=${POSTGRES_USER:-neonlink}
-      - NEONLINK_DB__PASSWORD=${POSTGRES_PASSWORD:-neonlink_secret}
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Docker}
+      - NEONLINK_LOG_LEVEL=${NEONLINK_LOG_LEVEL:-Information}
+      # Database connection from environment variables
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-neonlink}
+      - DB_USER=${DB_USER:-neonlink}
+      - DB_PASSWORD=${DB_PASSWORD:-neonlink_secret}
+      # Full connection string override (optional)
+      - ConnectionStrings__DefaultConnection=Host=${DB_HOST:-postgres};Port=${DB_PORT:-5432};Database=${DB_NAME:-neonlink};Username=${DB_USER:-neonlink};Password=${DB_PASSWORD:-neonlink_secret}
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,6 +63,8 @@ services:
       retries: 3
     volumes:
       - server-logs:/app/logs
+    env_file:
+      - .env
 
   # Flutter Android Builder
   flutter-builder:
@@ -70,11 +74,11 @@ services:
     container_name: neonlink-flutter-builder
     restart: "no"
     environment:
-      - FLUTTER_VERSION=3.24.0
+      - FLUTTER_VERSION=${FLUTTER_VERSION:-3.24.0}
       - ANDROID_SDK_ROOT=/opt/android-sdk
       - ANDROID_NDK_VERSION=26.1.10909125
     volumes:
-      - ./neonlink_app:/app/src
+      - ./neonlink_app:/app/src:ro
       - flutter_cache:/flutter/.pub-cache
       - android_sdk:/opt/android-sdk
       - ./output:/app/output
@@ -92,7 +96,7 @@ services:
     container_name: neonlink-web
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "${WEB_PORT:-8080}:80"
     depends_on:
       - server
     networks:

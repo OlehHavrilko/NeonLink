@@ -1,166 +1,159 @@
-using NeonLink.Server.Configuration;
-using NeonLink.Server.Models;
-using NeonLink.Server.Services;
+using Microsoft.Extensions.Logging;
 
 namespace NeonLink.Server.Tests;
 
 /// <summary>
-///     Тесты для CacheService
+///     Unit tests for CacheService
 /// </summary>
-public class CacheServiceTests
+public class CacheServiceTests : IDisposable
 {
-    private readonly Settings _settings;
+    private readonly CacheService _cacheService;
     private readonly Mock<ILogger<CacheService>> _loggerMock;
+    private readonly Settings _settings;
 
     public CacheServiceTests()
     {
-        _settings = new Settings();
         _loggerMock = new Mock<ILogger<CacheService>>();
+        _settings = new Settings();
+        _cacheService = new CacheService(_loggerMock.Object, _settings);
     }
 
     [Fact]
-    public void GetCpuName_ReturnsCachedValue()
+    public void Constructor_ShouldInitializeCorrectly()
     {
-        // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        var actualName = "Intel Core i7-12700K";
-        
-        // Act
-        var cachedName = service.GetCpuName(actualName);
-        
+        // Arrange & Act - done in constructor
+
         // Assert
-        Assert.Equal(actualName, cachedName);
+        _cacheService.CacheSize.Should().Be(0);
     }
 
     [Fact]
-    public void GetGpuName_ReturnsCachedValue()
+    public void GetCpuName_WhenNotCached_ShouldReturnActualValue()
     {
         // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        var actualName = "NVIDIA GeForce RTX 3080";
-        
+        var cpuName = "Intel Core i9-13900K";
+
         // Act
-        var cachedName = service.GetGpuName(actualName);
-        
+        var result = _cacheService.GetCpuName(cpuName);
+
         // Assert
-        Assert.Equal(actualName, cachedName);
+        result.Should().Be(cpuName);
+        _cacheService.CacheSize.Should().Be(1);
     }
 
     [Fact]
-    public void GetRamTotal_ReturnsCachedValue()
+    public void GetCpuName_WhenCached_ShouldReturnCachedValue()
     {
         // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        var actualValue = 32.0;
-        
+        var cpuName = "Intel Core i9-13900K";
+        _cacheService.GetCpuName(cpuName);
+
+        // Act - call with different value
+        var result = _cacheService.GetCpuName("AMD Ryzen 9 7950X");
+
+        // Assert - should return cached value
+        result.Should().Be(cpuName);
+    }
+
+    [Fact]
+    public void GetGpuName_WhenNotCached_ShouldReturnActualValue()
+    {
+        // Arrange
+        var gpuName = "NVIDIA RTX 4090";
+
         // Act
-        var cachedValue = service.GetRamTotal(actualValue);
-        
+        var result = _cacheService.GetGpuName(gpuName);
+
         // Assert
-        Assert.Equal(actualValue, cachedValue);
+        result.Should().Be(gpuName);
     }
 
     [Fact]
-    public void GetCachedHardwareInfo_ReturnsAllCachedInfo()
+    public void GetRamTotal_WhenNotCached_ShouldReturnActualValue()
     {
         // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        service.GetCpuName("Intel Core i7");
-        service.GetGpuName("NVIDIA RTX 3080");
-        service.GetRamTotal(32.0);
-        
+        var ramTotal = 64.0;
+
         // Act
-        var info = service.GetCachedHardwareInfo();
-        
+        var result = _cacheService.GetRamTotal(ramTotal);
+
         // Assert
-        Assert.Equal("Intel Core i7", info.CpuName);
-        Assert.Equal("NVIDIA RTX 3080", info.GpuName);
-        Assert.Equal(32.0, info.RamTotal);
+        result.Should().Be(ramTotal);
     }
 
     [Fact]
-    public void ShouldRefreshCache_InitiallyTrue()
+    public void ShouldRefreshCache_WhenJustInitialized_ShouldReturnTrue()
+    {
+        // Arrange & Act
+        var result = _cacheService.ShouldRefreshCache();
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact]
+    public void InvalidateCache_ShouldClearAllCachedItems()
     {
         // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        
+        _cacheService.GetCpuName("Test CPU");
+        _cacheService.GetGpuName("Test GPU");
+        _cacheService.CacheSize.Should().Be(2);
+
         // Act
-        var result = service.ShouldRefreshCache();
-        
+        _cacheService.InvalidateCache();
+
         // Assert
-        Assert.True(result); // Кеш пуст, нужно обновить
+        _cacheService.CacheSize.Should().Be(0);
     }
 
     [Fact]
-    public void InvalidateCache_ClearsAllData()
+    public void UpdateHardwareInfo_ShouldAddOrUpdateCache()
     {
         // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        service.GetCpuName("Intel Core i7");
-        service.GetGpuName("NVIDIA RTX 3080");
-        
+        var key = "TestKey";
+        var value = "TestValue";
+
         // Act
-        service.InvalidateCache();
-        var info = service.GetCachedHardwareInfo();
-        
+        _cacheService.UpdateHardwareInfo(key, value);
+
         // Assert
-        Assert.Null(info.CpuName);
-        Assert.Null(info.GpuName);
+        _cacheService.CacheSize.Should().Be(1);
     }
 
     [Fact]
-    public void CacheSize_IncreasesWithCachedItems()
+    public void GetStats_ShouldReturnCorrectStatistics()
     {
         // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        
+        _cacheService.GetCpuName("Test CPU");
+        _cacheService.GetGpuName("Test GPU");
+
         // Act
-        service.GetCpuName("Intel");
-        service.GetGpuName("NVIDIA");
-        service.GetRamTotal(32.0);
-        
+        var stats = _cacheService.GetStats();
+
         // Assert
-        Assert.Equal(3, service.CacheSize);
+        stats.ItemsCount.Should().Be(2);
+        stats.CacheExpirationMinutes.Should().Be(60);
     }
 
     [Fact]
-    public void GetStats_ReturnsCorrectStats()
+    public void GetCachedHardwareInfo_ShouldReturnCachedInfo()
     {
         // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        service.GetCpuName("Intel");
-        
+        _cacheService.GetCpuName("Intel Core i9");
+        _cacheService.GetGpuName("RTX 4090");
+        _cacheService.GetRamTotal(64.0);
+
         // Act
-        var stats = service.GetStats();
-        
+        var info = _cacheService.GetCachedHardwareInfo();
+
         // Assert
-        Assert.Equal(1, stats.ItemsCount);
-        Assert.True(stats.CacheExpirationMinutes > 0);
+        info.CpuName.Should().Be("Intel Core i9");
+        info.GpuName.Should().Be("RTX 4090");
+        info.RamTotal.Should().Be(64.0);
     }
 
-    [Fact]
-    public void UpdateHardwareInfo_UpdatesExistingEntry()
+    public void Dispose()
     {
-        // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        service.GetCpuName("Intel Core i7");
-        
-        // Act
-        service.UpdateHardwareInfo("CpuName", "Intel Core i9");
-        var info = service.GetCachedHardwareInfo();
-        
-        // Assert
-        Assert.Equal("Intel Core i9", info.CpuName);
-    }
-
-    [Fact]
-    public void Dispose_CanBeCalledMultipleTimes()
-    {
-        // Arrange
-        var service = new CacheService(_loggerMock.Object, _settings);
-        
-        // Act & Assert - не должно вызвать исключение
-        service.Dispose();
-        service.Dispose();
+        _cacheService.Dispose();
     }
 }

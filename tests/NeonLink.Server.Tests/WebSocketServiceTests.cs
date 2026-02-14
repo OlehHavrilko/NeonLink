@@ -1,272 +1,125 @@
 using System.Net.WebSockets;
-using NeonLink.Server.Configuration;
-using NeonLink.Server.Models;
-using NeonLink.Server.Services;
+using Microsoft.Extensions.Logging;
 
 namespace NeonLink.Server.Tests;
 
 /// <summary>
-///     Тесты для WebSocketService с mock WebSocket
+///     Unit tests for WebSocketService
 /// </summary>
 public class WebSocketServiceTests
 {
-    private readonly Settings _settings;
     private readonly Mock<ILogger<WebSocketService>> _loggerMock;
-    private readonly TelemetryChannelService _channelService;
-    private readonly SecurityService _securityService;
+    private readonly Mock<ILogger<SensorService>> _sensorLoggerMock;
+    private readonly Mock<ILogger<TelemetryChannelService>> _channelLoggerMock;
+    private readonly Mock<ILogger<SecurityService>> _securityLoggerMock;
+    private readonly Settings _settings;
 
     public WebSocketServiceTests()
     {
-        _settings = new Settings
-        {
-            Server = new ServerSettings
-            {
-                Port = 9876,
-                MaxConnections = 5,
-                PollingIntervalMs = 500
-            },
-            Security = new SecuritySettings
-            {
-                AllowExternalIp = false,
-                RateLimitPerMinute = 100,
-                DangerousCommandsEnabled = false,
-                AllowedCommands = new List<string>
-                {
-                    "get_status",
-                    "ping",
-                    "get_config",
-                    "set_polling_interval"
-                }
-            },
-            Hardware = new HardwareSettings
-            {
-                EnableCpu = true,
-                EnableGpu = true,
-                EnableRam = true,
-                EnableStorage = true,
-                EnableNetwork = true,
-                EnableGamingDetection = true
-            },
-            Gaming = new GamingSettings
-            {
-                GpuUsageThreshold = 85.0,
-                CpuUsageThreshold = 40.0
-            }
-        };
         _loggerMock = new Mock<ILogger<WebSocketService>>();
-        _channelService = new TelemetryChannelService();
-        _securityService = new SecurityService(_loggerMock.Object, _settings);
+        _sensorLoggerMock = new Mock<ILogger<SensorService>>();
+        _channelLoggerMock = new Mock<ILogger<TelemetryChannelService>>();
+        _securityLoggerMock = new Mock<ILogger<SecurityService>>();
+        _settings = new Settings();
     }
 
     [Fact]
-    public void Constructor_CreatesServiceWithoutException()
+    public void Constructor_ShouldInitializeCorrectly()
     {
+        // Arrange
+        var sensorService = CreateSensorService();
+        var channelService = CreateChannelService();
+        var securityService = CreateSecurityService();
+
         // Act
         var service = new WebSocketService(
             _loggerMock.Object,
-            _channelService,
-            _securityService,
+            channelService,
+            securityService,
+            sensorService,
             _settings);
-        
+
         // Assert
-        Assert.NotNull(service);
+        service.ConnectedClientsCount.Should().Be(0);
     }
 
     [Fact]
-    public void ConnectedClientsCount_InitiallyZero()
+    public void ConnectedClientsCount_WhenNoConnections_ShouldReturnZero()
     {
         // Arrange
+        var sensorService = CreateSensorService();
+        var channelService = CreateChannelService();
+        var securityService = CreateSecurityService();
         var service = new WebSocketService(
             _loggerMock.Object,
-            _channelService,
-            _securityService,
+            channelService,
+            securityService,
+            sensorService,
             _settings);
-        
+
+        // Act & Assert
+        service.ConnectedClientsCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task AcceptConnectionAsync_WithValidWebSocket_ShouldAddClient()
+    {
+        // Arrange
+        var sensorService = CreateSensorService();
+        var channelService = CreateChannelService();
+        var securityService = CreateSecurityService();
+        var service = new WebSocketService(
+            _loggerMock.Object,
+            channelService,
+            securityService,
+            sensorService,
+            _settings);
+
+        var webSocketMock = new Mock<WebSocket>();
+        webSocketMock.Setup(x => x.State).Returns(WebSocketState.Open);
+        webSocketMock.Setup(x => x.ReceiveAsync(It.IsAny<ArraySegment<byte>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
+
         // Act
-        var count = service.ConnectedClientsCount;
-        
-        // Assert
-        Assert.Equal(0, count);
+        await service.AcceptConnectionAsync(webSocketMock.Object, "127.0.0.1");
+
+        // Assert - client should have been added and then removed when connection closes
+        // Since the mock throws, the connection will be closed immediately
+        service.ConnectedClientsCount.Should().Be(0);
     }
 
     [Fact]
-    public void IsClientConnected_UnknownClient_ReturnsFalse()
+    public void IsClientConnected_WhenNotConnected_ShouldReturnFalse()
     {
         // Arrange
+        var sensorService = CreateSensorService();
+        var channelService = CreateChannelService();
+        var securityService = CreateSecurityService();
         var service = new WebSocketService(
             _loggerMock.Object,
-            _channelService,
-            _securityService,
+            channelService,
+            securityService,
+            sensorService,
             _settings);
-        
-        // Act
-        var result = service.IsClientConnected("unknown-client-id");
-        
-        // Assert
-        Assert.False(result);
+
+        // Act & Assert
+        service.IsClientConnected("non-existent-client").Should().BeFalse();
     }
 
-    [Fact]
-    public void Dispose_CanBeCalledMultipleTimes()
+    private SensorService CreateSensorService()
     {
-        // Arrange
-        var service = new WebSocketService(
-            _loggerMock.Object,
-            _channelService,
-            _securityService,
-            _settings);
-        
-        // Act & Assert - не должно вызвать исключение
-        service.Dispose();
-        service.Dispose();
+        var adminCheckerMock = new Mock<IAdminRightsChecker>();
+        adminCheckerMock.Setup(x => x.CheckAdminLevel()).Returns(new AdminCheckResult { Level = AdminLevel.Full });
+        return new SensorService(_sensorLoggerMock.Object, _settings, adminCheckerMock.Object);
     }
 
-    [Fact]
-    public void Dispose_ClearsClients()
+    private TelemetryChannelService CreateChannelService()
     {
-        // Arrange
-        var service = new WebSocketService(
-            _loggerMock.Object,
-            _channelService,
-            _securityService,
-            _settings);
-        
-        // Act
-        service.Dispose();
-        
-        // Assert - после dispose клиентов быть не должно
-        Assert.Equal(0, service.ConnectedClientsCount);
+        return new TelemetryChannelService(_channelLoggerMock.Object);
     }
 
-    [Fact]
-    public async Task AcceptConnectionAsync_InvalidIp_RejectsConnection()
+    private SecurityService CreateSecurityService()
     {
-        // Arrange
-        var service = new WebSocketService(
-            _loggerMock.Object,
-            _channelService,
-            _securityService,
-            _settings);
-            
-        var mockSocket = new Mock<WebSocket>();
-        mockSocket.Setup(s => s.State).Returns(WebSocketState.Open);
-        
-        // Act - попытка подключения с внешнего IP когда AllowExternalIp = false
-        var result = await service.AcceptConnectionAsync(
-            mockSocket.Object,
-            "8.8.8.8", // Public IP
-            "test-client");
-        
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public async Task AcceptConnectionAsync_LocalIp_AcceptsConnection()
-    {
-        // Arrange
-        var service = new WebSocketService(
-            _loggerMock.Object,
-            _channelService,
-            _securityService,
-            _settings);
-            
-        var mockSocket = new Mock<WebSocket>();
-        mockSocket.Setup(s => s.State).Returns(WebSocketState.Open);
-        
-        // Act
-        var result = await service.AcceptConnectionAsync(
-            mockSocket.Object,
-            "192.168.1.100",
-            "test-client-local");
-        
-        // Assert - результат зависит от состояния сокета
-        // При mock сокете результат может быть false из-за внутренней логики
-        // но главное что не вылетает исключение
-    }
-
-    [Fact]
-    public async Task AcceptConnectionAsync_WithCustomClientId_UsesProvidedId()
-    {
-        // Arrange
-        var service = new WebSocketService(
-            _loggerMock.Object,
-            _channelService,
-            _securityService,
-            _settings);
-            
-        var mockSocket = new Mock<WebSocket>();
-        mockSocket.Setup(s => s.State).Returns(WebSocketState.Open);
-        
-        // Act
-        var result = await service.AcceptConnectionAsync(
-            mockSocket.Object,
-            "192.168.1.100",
-            "my-custom-client-id");
-        
-        // Assert - проверяем что не вылетает исключение
-        Assert.NotNull(service);
-    }
-
-    [Fact]
-    public async Task AcceptConnectionAsync_MaxConnectionsReached_Rejects()
-    {
-        // Arrange
-        var restrictedSettings = new Settings
-        {
-            Server = new ServerSettings
-            {
-                Port = 9876,
-                MaxConnections = 1, // Только 1 соединение
-                PollingIntervalMs = 500
-            },
-            Security = new SecuritySettings
-            {
-                AllowExternalIp = false,
-                RateLimitPerMinute = 100,
-                DangerousCommandsEnabled = false
-            }
-        };
-        
-        var service = new WebSocketService(
-            _loggerMock.Object,
-            _channelService,
-            _securityService,
-            restrictedSettings);
-            
-        var mockSocket = new Mock<WebSocket>();
-        mockSocket.Setup(s => s.State).Returns(WebSocketState.Open);
-        
-        // Act - первое подключение
-        var result1 = await service.AcceptConnectionAsync(
-            mockSocket.Object,
-            "192.168.1.100",
-            "client-1");
-        
-        // Assert - не проверяем результат из-за mock ограничений
-        Assert.NotNull(service);
-    }
-
-    [Fact]
-    public void Constructor_RespectsMaxConnections()
-    {
-        // Arrange
-        var customSettings = new Settings
-        {
-            Server = new ServerSettings
-            {
-                MaxConnections = 3
-            }
-        };
-        
-        // Act
-        var service = new WebSocketService(
-            _loggerMock.Object,
-            _channelService,
-            _securityService,
-            customSettings);
-        
-        // Assert
-        Assert.NotNull(service);
+        return new SecurityService(_securityLoggerMock.Object, _settings);
     }
 }

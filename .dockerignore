@@ -4,29 +4,86 @@
 # For more help, visit the .dockerignore file reference guide at
 # https://docs.docker.com/go/build-context-dockerignore/
 
+# OS generated files
 **/.DS_Store
+**/Thumbs.db
+**/ehthumbs.db
+
+# IDE and editor files
 **/.classpath
-**/.dockerignore
-**/.env
-**/.git
-**/.gitignore
 **/.project
 **/.settings
 **/.toolstarget
 **/.vs
 **/.vscode
+**/.idea
 **/*.*proj.user
 **/*.dbmdl
 **/*.jfm
-**/bin
-**/charts
+
+# Version control
+**/.git
+**/.gitignore
+**/.gitattributes
+
+# Docker files (prevent recursive builds)
+**/.dockerignore
 **/docker-compose*
 **/compose.y*ml
 **/Dockerfile*
-**/node_modules
-**/npm-debug.log
+
+# Build artifacts
+**/bin
 **/obj
+**/node_modules
+**/build
+**/dist
+**/*.dll
+**/*.exe
+**/*.pdb
+
+# Python artifacts
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/.mypy_cache
+**/*.egg-info
+**/venv
+**/.venv
+
+# Flutter/Dart artifacts
+**/.dart_tool
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+
+# Test results and coverage
+**/TestResults
+**/coverage
+**/.coverage
+**/coverage.json
+
+# Local configuration with secrets
+**/.env
+**/.env.local
+**/.env.*.local
+**/appsettings.Development.json
 **/secrets.dev.yaml
 **/values.dev.yaml
+
+# Documentation and license
 LICENSE
 README.md
+README.Docker.md
+docs/
+
+# Temporary files
+**/*.log
+**/*.tmp
+**/*.temp
+**/.temp
+**/.tmp
+
+# Charts and Kubernetes
+**/charts
