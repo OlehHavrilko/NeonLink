@@ -20,7 +20,7 @@ dependencies:
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1
   
-  # Charts
+  # Charts - для Graph Mode
   fl_chart: ^0.68.0
   
   # WebSocket
@@ -32,6 +32,10 @@ dependencies:
   # Local Storage
   shared_preferences: ^2.2.0
   hive: ^2.2.3
+  
+  # SQLite for logs
+  sqflite: ^2.3.0
+  path_provider: ^2.1.0
   
   # WakeLock
   wakelock_plus: ^1.4.0
@@ -47,6 +51,15 @@ dependencies:
   
   # Network + Connectivity
   connectivity_plus: ^5.0.0
+  
+  # Notifications
+  flutter_local_notifications: ^17.0.0
+  
+  # Share/Export
+  share_plus: ^7.2.0
+  
+  # File Picker для бэкапов
+  file_picker: ^6.1.1
 
 dev_dependencies:
   flutter_test:

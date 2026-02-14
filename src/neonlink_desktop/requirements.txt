@@ -26,6 +26,15 @@ watchdog>=4.0
 loguru>=0.7
 colorlog>=6.8
 
+# Database for logging
+aiosqlite>=0.19
+
+# System notifications
+plyer>=2.1
+
+# Version parsing
+packaging>=23.0
+
 # Utilities
 tenacity>=8.2
 marshmallow>=3.20

@@ -19,6 +19,14 @@ a = Analysis(
         'aiohttp',
         'cryptography',
         'keyring',
+        # Logging
+        'loguru',
+        'colorlog',
+        'aiosqlite',
+        # Notifications
+        'plyer',
+        # Version parsing
+        'packaging',
     ],
     hookspath=[],
     hooksconfig={},

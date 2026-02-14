@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/discovery_service.dart';
-import '../../../services/websocket_service.dart';
+import '../../../providers/connection_provider.dart';
 import '../../shared/widgets/status_indicator.dart';
 
-class ConnectionScreen extends StatefulWidget {
+class ConnectionScreen extends ConsumerStatefulWidget {
   const ConnectionScreen({super.key});
 
   @override
-  State<ConnectionScreen> createState() => _ConnectionScreenState();
+  ConsumerState<ConnectionScreen> createState() => _ConnectionScreenState();
 }
 
-class _ConnectionScreenState extends State<ConnectionScreen> {
+class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   final _ipController = TextEditingController();
   final _portController = TextEditingController(text: AppConstants.defaultPort.toString());
   final List<DiscoveredPC> _discoveredPCs = [];
@@ -82,20 +83,27 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     final port = int.tryParse(_portController.text) ?? AppConstants.defaultPort;
 
     if (ip.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter IP address')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter IP address')),
+        );
+      }
       return;
     }
 
-    final webSocketService = WebSocketService();
-    
     try {
-      await webSocketService.connect(ip, port);
+      await ref.read(connectionProvider.notifier).connect(ip, port);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Connected to $ip:$port')),
-        );
+        final state = ref.read(connectionProvider);
+        if (state.isConnected) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Connected to $ip:$port')),
+          );
+        } else if (state.hasError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Connection failed: ${state.error}')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
